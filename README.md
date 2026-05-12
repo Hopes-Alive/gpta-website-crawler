@@ -47,26 +47,39 @@ python -m pytest tests/ -v
 
 ## Deploy to Azure (Web App for Containers)
 
-- **GHCR** ([ghcr.io](https://ghcr.io)) — if your Web App registry URL is GitHub Container Registry: **`.github/workflows/deploy-ghcr-webapp.yml`**
-- **ACR** — Azure Container Registry: **`.github/workflows/deploy-acr-webapp.yml`**
+### Local (no GitHub Actions)
 
-One-time OIDC + variables: **[docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md)**.
+Build and push from your machine, then update the Web App with Azure CLI — see **[docs/LOCAL-DEPLOY.md](./docs/LOCAL-DEPLOY.md)**.
+
+```powershell
+copy env.deploy.local.example .env.deploy.local
+# edit .env.deploy.local
+.\scripts\deploy-local.ps1
+```
+
+### GitHub Actions (optional)
+
+- **GHCR** ([ghcr.io](https://ghcr.io)): **`.github/workflows/deploy-ghcr-webapp.yml`**
+- **ACR**: **`.github/workflows/deploy-acr-webapp.yml`**
+
+Details: **[docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md)**.
 
 ```bash
 gh workflow run deploy-ghcr-webapp.yml --ref main   # GHCR
-# gh workflow run deploy-acr-webapp.yml --ref main   # ACR
 ```
 
-Or on Windows: `.\scripts\trigger-deploy.ps1` (defaults to GHCR workflow; edit script to switch).
+Or: `.\scripts\trigger-deploy.ps1` (uses `gh`; defaults to GHCR workflow).
 
-In **Cursor**, open this repo and ask the agent to **deploy** — the rule in `.cursor/rules/azure-deploy-crawler.mdc` picks **GHCR or ACR** workflow as documented.
+In **Cursor**, ask to **deploy** — the rule in `.cursor/rules/azure-deploy-crawler.mdc` covers **local** and **Actions** paths.
 
-## CI
+## CI (optional)
 
-- **GHCR + Web App:** `deploy-ghcr-webapp.yml`
-- **ACR + Web App:** `deploy-acr-webapp.yml`
+- **GHCR + Web App:** `deploy-ghcr-webapp.yml` (GitHub Actions)
+- **ACR + Web App:** `deploy-acr-webapp.yml` (GitHub Actions)
+- **Local:** `scripts/deploy-local.ps1` / `scripts/deploy-local.sh` — no GitHub required
 
 ## Docs
 
 See [CRAWLER_AGENTS.md](./CRAWLER_AGENTS.md) for API details and security notes.
-See [docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md) for Azure variables, OIDC, and GPTA `WEBSITE_CRAWLER_URL`.
+See [docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md) for GitHub Actions + OIDC.
+See [docs/LOCAL-DEPLOY.md](./docs/LOCAL-DEPLOY.md) for **local** Docker + `az` deploy (no GitHub).

@@ -120,6 +120,9 @@ Thumbs.db
 *.log
 logs/
 
+# Local deploy (Docker push + Azure CLI) — copy env.deploy.local.example
+.env.deploy.local
+
 # Local development
 .env.local
 .env.development.local

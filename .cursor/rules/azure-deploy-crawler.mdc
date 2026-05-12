@@ -1,11 +1,24 @@
 ---
-description: Deploy the GPTA website crawler to Azure (GHCR or ACR + Linux Web App) via GitHub Actions when the user asks to deploy.
+description: Deploy the GPTA website crawler to Azure (GHCR/ACR + Web App) via GitHub Actions or local scripts when the user asks to deploy.
 alwaysApply: true
 ---
 
 # Deploy website crawler (Azure)
 
-When the user asks to **deploy** the website crawler (or “push to GHCR/ACR”, “release crawler”, “deploy web app”), do this:
+When the user asks to **deploy** the website crawler:
+
+### Local (no GitHub / no Actions)
+
+If they want **local deployment** or **without GitHub**:
+
+1. Ensure **Docker** and **Azure CLI** (`az login`) are available.
+2. They copy **`env.deploy.local.example`** → **`.env.deploy.local`**, fill `DEPLOY_IMAGE`, registry credentials, `AZURE_WEBAPP_NAME`, `AZURE_RESOURCE_GROUP`.
+3. Run **`.\scripts\deploy-local.ps1`** (Windows) or **`./scripts/deploy-local.sh`** (macOS/Linux).
+4. See **`docs/LOCAL-DEPLOY.md`**.
+
+Do not ask them to paste **GHCR_TOKEN** or PATs into the chat.
+
+### GitHub Actions (optional)
 
 1. **Confirm one-time setup** (do not paste secret values into chat): GitHub Actions secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and variables — see `docs/DEPLOY-AZURE.md`.
    - **GHCR** (Web App uses `ghcr.io`): variables `AZURE_RESOURCE_GROUP`, `AZURE_WEBAPP_NAME`; optional `GHCR_IMAGE`.

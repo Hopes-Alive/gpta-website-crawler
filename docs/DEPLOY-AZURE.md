@@ -4,6 +4,7 @@ Pick **one** registry path:
 
 | Workflow | Registry | When to use |
 |----------|----------|-------------|
+| **Local scripts** | GHCR or ACR | **No GitHub** — see **[docs/LOCAL-DEPLOY.md](./LOCAL-DEPLOY.md)** |
 | **`deploy-ghcr-webapp.yml`** | [GitHub Container Registry](https://ghcr.io) (`ghcr.io/...`) | Web App **Configuration** uses `DOCKER_REGISTRY_SERVER_URL=https://ghcr.io` (your setup). |
 | **`deploy-acr-webapp.yml`** | Azure Container Registry (`*.azurecr.io`) | Web App pulls from ACR. |
 
