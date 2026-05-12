@@ -1,0 +1,17 @@
+﻿# Import for serverless function
+azure-functions>=1.19.0
+
+# Import for website crawler
+beautifulsoup4==4.13.4
+Crawl4AI==0.7.3
+fastapi==0.115.14
+httpx==0.28.1
+httpx-sse==0.4.1
+pydantic==2.11.7
+pydantic-settings==2.10.1
+pydantic_core==2.33.2
+selectolax==0.3.33
+uvicorn==0.35.0
+pytest-playwright
+pytest==8.4.1
+pytest-asyncio==0.25.3
