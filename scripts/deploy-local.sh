@@ -3,14 +3,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 ENV_FILE="$ROOT/.env.deploy.local"
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Missing $ENV_FILE — copy env.deploy.local.example to .env.deploy.local" >&2
-  exit 1
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "No .env.deploy.local — using existing environment variables." >&2
 fi
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
 
 : "${DEPLOY_IMAGE:?}"
 : "${AZURE_WEBAPP_NAME:?}"

@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
   Build Docker image, push to GHCR or ACR, update Azure Linux Web App container.
-  No GitHub Actions — uses .env.deploy.local (gitignored).
+  No GitHub Actions. Uses .env.deploy.local if present (gitignored), else process env.
 
 .EXAMPLE
   Copy env.deploy.local.example to .env.deploy.local, fill values, then:
@@ -13,23 +13,23 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
 $envFile = Join-Path $repoRoot ".env.deploy.local"
-if (-not (Test-Path $envFile)) {
-  Write-Error "Missing $envFile — copy env.deploy.local.example to .env.deploy.local and fill in values."
-}
-
-Get-Content $envFile | ForEach-Object {
-  $line = $_.Trim()
-  if (-not $line -or $line.StartsWith("#")) { return }
-  $i = $line.IndexOf("=")
-  if ($i -lt 1) { return }
-  $key = $line.Substring(0, $i).Trim()
-  $val = $line.Substring($i + 1).Trim().Trim('"').Trim("'")
-  [Environment]::SetEnvironmentVariable($key, $val, "Process")
+if (Test-Path $envFile) {
+  Get-Content $envFile | ForEach-Object {
+    $line = $_.Trim()
+    if (-not $line -or $line.StartsWith("#")) { return }
+    $i = $line.IndexOf("=")
+    if ($i -lt 1) { return }
+    $key = $line.Substring(0, $i).Trim()
+    $val = $line.Substring($i + 1).Trim().Trim('"').Trim("'")
+    [Environment]::SetEnvironmentVariable($key, $val, "Process")
+  }
+} else {
+  Write-Host 'No .env.deploy.local - using process environment (set DEPLOY_IMAGE, GHCR_USERNAME, GHCR_TOKEN, AZURE_WEBAPP_NAME, AZURE_RESOURCE_GROUP before running).'
 }
 
 function Require-Env([string]$name) {
   $v = [Environment]::GetEnvironmentVariable($name, "Process")
-  if (-not $v) { Write-Error "Missing required env: $name (set in .env.deploy.local)" }
+  if (-not $v) { Write-Error "Missing required env: $name (set in .env.deploy.local or export before running)" }
   return $v
 }
 
@@ -61,7 +61,7 @@ elseif ($image -match "^[^/]+\.azurecr\.io/") {
   $acrPass | docker login $server -u $acrUser --password-stdin
 }
 else {
-  Write-Error "DEPLOY_IMAGE must start with ghcr.io/ or be myregistry.azurecr.io/... — set ACR_* vars for ACR."
+  Write-Error "DEPLOY_IMAGE must start with ghcr.io/ or use an ACR host *.azurecr.io/ (set ACR_LOGIN_SERVER, ACR_USERNAME, ACR_PASSWORD)."
 }
 
 Write-Host "Pushing $image ..."
