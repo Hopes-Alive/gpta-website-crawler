@@ -45,10 +45,25 @@ docker run -p 8000:8000 gpta-website-crawler
 python -m pytest tests/ -v
 ```
 
+## Deploy to Azure (ACR + Web App)
+
+Use GitHub Actions **`.github/workflows/deploy-acr-webapp.yml`** (manual **Run workflow**). One-time OIDC + variables are documented in **[docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md)**.
+
+From a machine with [GitHub CLI](https://cli.github.com/) authenticated:
+
+```bash
+gh workflow run deploy-acr-webapp.yml --ref main
+```
+
+Or on Windows: `.\scripts\trigger-deploy.ps1`
+
+In **Cursor**, open this repo and ask the agent to **deploy** — the rule in `.cursor/rules/azure-deploy-crawler.mdc` points it at the same workflow.
+
 ## CI
 
-GitHub Actions workflows in `.github/workflows/` deploy to Azure (same publish profiles as before—configure **repository secrets** after you create this repo on GitHub).
+- **Container deploy:** `deploy-acr-webapp.yml` (see above).
 
 ## Docs
 
 See [CRAWLER_AGENTS.md](./CRAWLER_AGENTS.md) for API details and security notes.
+See [docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md) for Azure variables, OIDC, and GPTA `WEBSITE_CRAWLER_URL`.
