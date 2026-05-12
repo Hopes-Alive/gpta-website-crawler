@@ -45,23 +45,26 @@ docker run -p 8000:8000 gpta-website-crawler
 python -m pytest tests/ -v
 ```
 
-## Deploy to Azure (ACR + Web App)
+## Deploy to Azure (Web App for Containers)
 
-Use GitHub Actions **`.github/workflows/deploy-acr-webapp.yml`** (manual **Run workflow**). One-time OIDC + variables are documented in **[docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md)**.
+- **GHCR** ([ghcr.io](https://ghcr.io)) — if your Web App registry URL is GitHub Container Registry: **`.github/workflows/deploy-ghcr-webapp.yml`**
+- **ACR** — Azure Container Registry: **`.github/workflows/deploy-acr-webapp.yml`**
 
-From a machine with [GitHub CLI](https://cli.github.com/) authenticated:
+One-time OIDC + variables: **[docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md)**.
 
 ```bash
-gh workflow run deploy-acr-webapp.yml --ref main
+gh workflow run deploy-ghcr-webapp.yml --ref main   # GHCR
+# gh workflow run deploy-acr-webapp.yml --ref main   # ACR
 ```
 
-Or on Windows: `.\scripts\trigger-deploy.ps1`
+Or on Windows: `.\scripts\trigger-deploy.ps1` (defaults to GHCR workflow; edit script to switch).
 
-In **Cursor**, open this repo and ask the agent to **deploy** — the rule in `.cursor/rules/azure-deploy-crawler.mdc` points it at the same workflow.
+In **Cursor**, open this repo and ask the agent to **deploy** — the rule in `.cursor/rules/azure-deploy-crawler.mdc` picks **GHCR or ACR** workflow as documented.
 
 ## CI
 
-- **Container deploy:** `deploy-acr-webapp.yml` (see above).
+- **GHCR + Web App:** `deploy-ghcr-webapp.yml`
+- **ACR + Web App:** `deploy-acr-webapp.yml`
 
 ## Docs
 

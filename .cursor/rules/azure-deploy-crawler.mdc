@@ -1,28 +1,38 @@
 ---
-description: Deploy the GPTA website crawler to Azure (ACR + Linux Web App) via GitHub Actions when the user asks to deploy.
+description: Deploy the GPTA website crawler to Azure (GHCR or ACR + Linux Web App) via GitHub Actions when the user asks to deploy.
 alwaysApply: true
 ---
 
 # Deploy website crawler (Azure)
 
-When the user asks to **deploy** the website crawler (or “push to ACR”, “release crawler”, “deploy web app”), do this:
+When the user asks to **deploy** the website crawler (or “push to GHCR/ACR”, “release crawler”, “deploy web app”), do this:
 
-1. **Confirm one-time setup** (do not paste secret values into chat): GitHub Actions secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and variables `ACR_NAME`, `IMAGE_REPOSITORY`, `AZURE_RESOURCE_GROUP`, `AZURE_WEBAPP_NAME` — see `docs/DEPLOY-AZURE.md`.
+1. **Confirm one-time setup** (do not paste secret values into chat): GitHub Actions secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and variables — see `docs/DEPLOY-AZURE.md`.
+   - **GHCR** (Web App uses `ghcr.io`): variables `AZURE_RESOURCE_GROUP`, `AZURE_WEBAPP_NAME`; optional `GHCR_IMAGE`.
+   - **ACR**: variables `ACR_NAME`, `IMAGE_REPOSITORY`, `AZURE_RESOURCE_GROUP`, `AZURE_WEBAPP_NAME`.
 
-2. **Preferred: run the workflow** from the **repository root** (`gpta-website-crawler`), default branch `main` unless they specify otherwise:
+2. **Run the matching workflow** from the **repository root**, default branch `main` unless they specify otherwise:
+
+   **GitHub Container Registry (most common for `DOCKER_REGISTRY_SERVER_URL=https://ghcr.io`):**
+
+   ```bash
+   gh workflow run deploy-ghcr-webapp.yml --ref main
+   ```
+
+   **Azure Container Registry:**
 
    ```bash
    gh workflow run deploy-acr-webapp.yml --ref main
    ```
 
-   Optional custom image tag:
+   Optional custom image tag (both workflows):
 
    ```bash
-   gh workflow run deploy-acr-webapp.yml --ref main -f image_tag=<tag>
+   gh workflow run deploy-ghcr-webapp.yml --ref main -f image_tag=<tag>
    ```
 
-3. If `gh` is not available or not authenticated, tell them to use **GitHub → Actions → “Deploy crawler (ACR + Web App)” → Run workflow**.
+3. If `gh` is not available or not authenticated, tell them to use **GitHub → Actions** → **Deploy crawler (GHCR + Web App)** or **Deploy crawler (ACR + Web App)** → **Run workflow**.
 
-4. After a successful deploy, remind them to set GPTA **`WEBSITE_CRAWLER_URL`** to `https://<AZURE_WEBAPP_NAME>.azurewebsites.net/scrape` (replace with their real app host if custom domain).
+4. After a successful deploy, remind them to set GPTA **`WEBSITE_CRAWLER_URL`** to `https://<their-app-host>/scrape` (e.g. regional hostname like `https://website-crawler-….azurewebsites.net/scrape`).
 
 Do **not** re-run a deploy if a workflow is already in progress unless the user explicitly asks to retry or cancel.

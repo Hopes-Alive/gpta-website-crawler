@@ -1,4 +1,60 @@
-# Deploy to Azure (ACR + Linux Web App for Containers)
+# Deploy to Azure (Linux Web App for Containers)
+
+Pick **one** registry path:
+
+| Workflow | Registry | When to use |
+|----------|----------|-------------|
+| **`deploy-ghcr-webapp.yml`** | [GitHub Container Registry](https://ghcr.io) (`ghcr.io/...`) | Web App **Configuration** uses `DOCKER_REGISTRY_SERVER_URL=https://ghcr.io` (your setup). |
+| **`deploy-acr-webapp.yml`** | Azure Container Registry (`*.azurecr.io`) | Web App pulls from ACR. |
+
+---
+
+## GitHub Container Registry (GHCR) — typical setup
+
+Your Web App already has registry settings similar to:
+
+- `DOCKER_REGISTRY_SERVER_URL` = `https://ghcr.io`
+- `DOCKER_REGISTRY_SERVER_USERNAME` = your GitHub user (e.g. `zuhairm2001`)
+- `DOCKER_REGISTRY_SERVER_PASSWORD` = a **GitHub PAT** with `read:packages` (and `write:packages` only if you push manually from laptop — **not** stored in this repo)
+
+**Do not** paste the PAT into GitHub Issues or chat. Only in **Azure Portal → Web App → Configuration**.
+
+### GitHub Actions variables (GHCR workflow)
+
+| Variable | Your example | Notes |
+|----------|----------------|-------|
+| `AZURE_RESOURCE_GROUP` | `mpn-aicg-hotelai-perm-dev-rg-ae` | Resource group containing the Web App |
+| `AZURE_WEBAPP_NAME` | `website-crawler-e0chg5dhhugzgyfm` | From hostname `website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net` ([live check](https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/)) |
+| `GHCR_IMAGE` (optional) | `ghcr.io/zuhairm2001/gpta-website-crawler` | Set if the image name **must** differ from `ghcr.io/<lowercase_owner>/<lowercase_repo>` |
+
+### GitHub Actions secrets (same for GHCR or ACR deploy)
+
+| Secret | Still required? |
+|--------|------------------|
+| `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | **Yes** — for OIDC so the workflow can call `azure/webapps-deploy`. We still need your **Azure subscription ID** if it is not already in secrets. |
+
+### Run (GHCR)
+
+```bash
+gh workflow run deploy-ghcr-webapp.yml --ref main
+```
+
+### GPTA `WEBSITE_CRAWLER_URL`
+
+Use the public app URL (no trailing slash before path is fine):
+
+```text
+https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/scrape
+```
+
+### Portal hygiene
+
+- Remove **duplicate** application settings keys (you listed `DOCKER_REGISTRY_SERVER_USERNAME` twice).
+- Keep **`WEBSITES_PORT`** = **`8000`** for this image.
+
+---
+
+## Azure Container Registry (ACR)
 
 This repo ships **`.github/workflows/deploy-acr-webapp.yml`**: build the `Dockerfile`, push to your **Azure Container Registry**, then point your existing **Web App** at that image.
 

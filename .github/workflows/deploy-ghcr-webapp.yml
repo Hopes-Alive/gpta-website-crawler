@@ -1,0 +1,91 @@
+# Build Docker image → push to GitHub Container Registry (ghcr.io) → update Linux Web App container
+#
+# Required GitHub Actions secrets (OIDC): AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# Required GitHub Actions variables: AZURE_RESOURCE_GROUP, AZURE_WEBAPP_NAME
+# Optional variable: GHCR_IMAGE (full base without tag, e.g. ghcr.io/zuhairm2001/gpta-website-crawler). If unset, uses ghcr.io/<lowercase_owner>/<lowercase_repo_name>.
+#
+# Workflow needs permission to push packages: packages: write (uses GITHUB_TOKEN for ghcr.io login).
+# See docs/DEPLOY-AZURE.md (GHCR section).
+
+name: Deploy crawler (GHCR + Web App)
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker tag (leave empty for 7-char git SHA)"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-crawler-ghcr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: meta
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            echo "tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve GHCR image (lowercase required by GHCR)
+        id: image
+        env:
+          GHCR_IMAGE_VAR: ${{ vars.GHCR_IMAGE }}
+        run: |
+          set -eux
+          if [ -n "${GHCR_IMAGE_VAR}" ]; then
+            base="${GHCR_IMAGE_VAR}"
+          else
+            owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            repo=$(echo "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')
+            base="ghcr.io/${owner}/${repo}"
+          fi
+          echo "base=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -eux
+          IMAGE="${{ steps.image.outputs.base }}:${TAG}"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+          echo "Pushing ${IMAGE}"
+          docker build -t "${IMAGE}" .
+          docker push "${IMAGE}"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy container to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP }}
+          slot-name: production
+          images: ${{ env.IMAGE }}
