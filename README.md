@@ -32,6 +32,8 @@ WEBSITE_CRAWLER_TIMEOUT_MS=600000
 
 Use the **public HTTPS URL** of this service in production (the crawler validates that target URLs are public hosts).
 
+For request/response details and integration examples, see **[docs/API-USAGE.md](./docs/API-USAGE.md)**.
+
 ## Docker
 
 ```bash
@@ -81,5 +83,6 @@ In **Cursor**, ask to **deploy** — the rule in `.cursor/rules/azure-deploy-cra
 ## Docs
 
 See [CRAWLER_AGENTS.md](./CRAWLER_AGENTS.md) for API details and security notes.
+See [docs/API-USAGE.md](./docs/API-USAGE.md) for calling this API from another Web App.
 See [docs/DEPLOY-AZURE.md](./docs/DEPLOY-AZURE.md) for GitHub Actions + OIDC.
 See [docs/LOCAL-DEPLOY.md](./docs/LOCAL-DEPLOY.md) for **local** Docker + `az` deploy (no GitHub).

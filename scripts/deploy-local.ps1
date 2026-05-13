@@ -33,6 +33,16 @@ function Require-Env([string]$name) {
   return $v
 }
 
+function Optional-Env([string]$name) {
+  return [Environment]::GetEnvironmentVariable($name, "Process")
+}
+
+function Assert-Exit([string]$step) {
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "$step failed (exit $LASTEXITCODE)"
+  }
+}
+
 $image = Require-Env "DEPLOY_IMAGE"
 $webapp = Require-Env "AZURE_WEBAPP_NAME"
 $rg = Require-Env "AZURE_RESOURCE_GROUP"
@@ -45,6 +55,7 @@ foreach ($cmd in @("docker", "az")) {
 
 Write-Host "Building $image ..."
 docker build -t $image .
+Assert-Exit "docker build"
 
 $lower = $image.ToLowerInvariant()
 if ($lower.StartsWith("ghcr.io/")) {
@@ -52,28 +63,43 @@ if ($lower.StartsWith("ghcr.io/")) {
   $token = Require-Env "GHCR_TOKEN"
   Write-Host "Logging in to ghcr.io ..."
   $token | docker login ghcr.io -u $user --password-stdin
+  Assert-Exit "docker login (ghcr.io)"
 }
 elseif ($image -match "^[^/]+\.azurecr\.io/") {
   $server = Require-Env "ACR_LOGIN_SERVER"
-  $acrUser = Require-Env "ACR_USERNAME"
-  $acrPass = Require-Env "ACR_PASSWORD"
-  Write-Host "Logging in to $server ..."
-  $acrPass | docker login $server -u $acrUser --password-stdin
+  $acrUser = Optional-Env "ACR_USERNAME"
+  $acrPass = Optional-Env "ACR_PASSWORD"
+  if ($acrUser -and $acrPass) {
+    Write-Host "Logging in to $server with ACR credentials ..."
+    $acrPass | docker login $server -u $acrUser --password-stdin
+    Assert-Exit "docker login ($server)"
+  } else {
+    $acrName = Optional-Env "ACR_NAME"
+    if (-not $acrName) {
+      $acrName = $server.Split(".")[0]
+    }
+    Write-Host "Logging in to ACR $acrName with Azure CLI ..."
+    az acr login --name $acrName
+    Assert-Exit "az acr login ($acrName)"
+  }
 }
 else {
-  Write-Error "DEPLOY_IMAGE must start with ghcr.io/ or use an ACR host *.azurecr.io/ (set ACR_LOGIN_SERVER, ACR_USERNAME, ACR_PASSWORD)."
+  Write-Error "DEPLOY_IMAGE must start with ghcr.io/ or use an ACR host *.azurecr.io/ (set ACR_LOGIN_SERVER and optionally ACR_NAME)."
 }
 
 Write-Host "Pushing $image ..."
 docker push $image
+Assert-Exit "docker push"
 
 Write-Host "Updating Web App container (Azure CLI) ..."
 az webapp config container set `
   --resource-group $rg `
   --name $webapp `
   --container-image-name $image
+Assert-Exit "az webapp config container set"
 
 Write-Host "Restarting app ..."
 az webapp restart --resource-group $rg --name $webapp
+Assert-Exit "az webapp restart"
 
 Write-Host "Done. Image: $image"

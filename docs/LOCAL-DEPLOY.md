@@ -8,6 +8,17 @@ Build on your machine, push the image with **Docker**, and point the **Azure Web
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) (`az`) and `az login` (correct subscription selected)
 - A registry credential that can **push** (GHCR PAT with `write:packages`, or ACR admin / service principal)
 
+### GHCR and `gh auth token`
+
+The GitHub CLI OAuth token often has scopes like `repo` only. Pushing to `ghcr.io` needs **`write:packages`** (and typically `read:packages`). Either:
+
+- Put a **classic PAT** with `write:packages` in `GHCR_TOKEN` inside `.env.deploy.local`, or
+- Run `gh auth refresh -h github.com -s write:packages` once and approve in the browser, then `gh auth token` will work for `docker push`.
+
+### Web App name vs URL
+
+`AZURE_WEBAPP_NAME` must be the **Azure resource name** (`az webapp list -g YOUR_RG -o table` → **Name** column), for example `website-crawler`. It is **not** the first segment of `*.azurewebsites.net` unless they happen to match.
+
 ## Configure once
 
 ```bash

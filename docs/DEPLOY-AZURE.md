@@ -25,7 +25,7 @@ Your Web App already has registry settings similar to:
 | Variable | Your example | Notes |
 |----------|----------------|-------|
 | `AZURE_RESOURCE_GROUP` | `mpn-aicg-hotelai-perm-dev-rg-ae` | Resource group containing the Web App |
-| `AZURE_WEBAPP_NAME` | `website-crawler-e0chg5dhhugzgyfm` | From hostname `website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net` ([live check](https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/)) |
+| `AZURE_WEBAPP_NAME` | `website-crawler` | Azure **resource** name from `az webapp list` (Name column). The default hostname can still look like `website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net` ([live check](https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/)). |
 | `GHCR_IMAGE` (optional) | `ghcr.io/zuhairm2001/gpta-website-crawler` | Set if the image name **must** differ from `ghcr.io/<lowercase_owner>/<lowercase_repo>` |
 
 ### GitHub Actions secrets (same for GHCR or ACR deploy)
