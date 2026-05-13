@@ -4,12 +4,32 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
+import time
 from collections import deque
 from typing import Awaitable, Callable, Optional
 from urllib.parse import urlparse, urljoin, urldefrag
 
 from bs4 import BeautifulSoup
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+
+# ---------- Structured logger ----------
+
+_W = 64  # log line width
+
+
+def _sep(char: str = "─") -> None:
+    print(char * _W, flush=True)
+
+
+def _banner(title: str, char: str = "═") -> None:
+    print(char * _W, flush=True)
+    print(f"  {title}", flush=True)
+    print(char * _W, flush=True)
+
+
+def _field(label: str, value: object, indent: int = 4) -> None:
+    pad = " " * indent
+    print(f"{pad}{label:<18}{value}", flush=True)
 
 FetchOne = Callable[[str], Awaitable[tuple[list[str], str]]]
 
@@ -132,10 +152,14 @@ async def _fetch_and_extract(crawler: AsyncWebCrawler, url: str, base_domain: st
         wait_for="css:body",
         js_code=["window.scrollTo(0, document.body.scrollHeight);"],
     )
+    t0 = time.perf_counter()
     result = await crawler.arun(url=url, config=cfg)
+    elapsed = time.perf_counter() - t0
+
     if not getattr(result, "success", False):
         status = getattr(result, "status_code", "unknown")
-        print(f" ❌ Failed: {url} (status: {status})")
+        print(f"  ❌  FAILED     status={status}  ({elapsed:.2f}s)", flush=True)
+        print(f"       url : {url}", flush=True)
         return [], ""
 
     html = getattr(result, "html", "") or ""
@@ -144,7 +168,8 @@ async def _fetch_and_extract(crawler: AsyncWebCrawler, url: str, base_domain: st
         cleaned_text = _markdown_from_result(result)
     low = cleaned_text.lower()
     if ("page you are trying to access is no longer available" in low) or ("404" in low and "page" in low):
-        print(f" ⚠️ Skipped error/empty: {url}")
+        print(f"  ⚠️  SKIPPED    error/404 page  ({elapsed:.2f}s)", flush=True)
+        print(f"       url : {url}", flush=True)
         return [], ""
 
     links_field = getattr(result, "links", None)
@@ -167,7 +192,13 @@ async def _fetch_and_extract(crawler: AsyncWebCrawler, url: str, base_domain: st
         if same_domain(absolute, base_domain) and not should_skip_url(absolute):
             internal_links.append(absolute)
 
-    print(f" ✅ Success: {url} (+{len(internal_links)} links)")
+    ctx_chars = len(cleaned_text)
+    preview = cleaned_text[:80].replace("\n", " ").strip()
+    print(
+        f"  ✅  OK   links={len(internal_links):<4}  ctx={ctx_chars:>7,} chars  ({elapsed:.2f}s)",
+        flush=True,
+    )
+    print(f"       preview : {preview!r}", flush=True)
     return internal_links, cleaned_text
 
 
@@ -207,8 +238,17 @@ async def bfs_crawl_same_site(
     content_hashes: set[str] = set()
     texts: list[str] = []
     pages_fetched = 0
+    pages_skipped = 0
+    pages_failed = 0
+    job_start = time.perf_counter()
 
-    print(f"🚀 Crawl: {start_url} (domain: {base_domain}, hops≤{link_hop_limit}, max_urls={max_urls})")
+    _banner("🕷  CRAWL JOB STARTED")
+    _field("URL", start_url)
+    _field("Domain", base_domain)
+    _field("Max hops", link_hop_limit)
+    _field("Max URLs", max_urls)
+    _field("Batch size", batch_size)
+    _sep()
 
     while to_visit and len(visited) < max_urls:
         batch: list[tuple[str, int]] = []
@@ -218,14 +258,22 @@ async def bfs_crawl_same_site(
                 continue
             if pages_fetched > 0 and should_skip_url(u):
                 visited.add(u)
+                pages_skipped += 1
                 continue
             visited.add(u)
             pages_fetched += 1
-            print(f"[{len(visited)}/{max_urls}] Depth {depth} → {u}")
             batch.append((u, depth))
 
         if not batch:
             break
+
+        for u, depth in batch:
+            hop_label = f"hop {depth}" if link_hop_limit > 0 else "single page"
+            print(
+                f"\n  [{pages_fetched - len(batch) + batch.index((u, depth)) + 1:>4}/{max_urls}]"
+                f"  {hop_label}  →  {u}",
+                flush=True,
+            )
 
         tasks = [fetch_one(u) for (u, _) in batch]
         results = await asyncio.gather(*tasks)
@@ -236,6 +284,10 @@ async def bfs_crawl_same_site(
                 if h not in content_hashes:
                     content_hashes.add(h)
                     texts.append(text)
+                else:
+                    print("       (duplicate content, skipped)", flush=True)
+            else:
+                pages_failed += 1
 
             next_depth = depth + 1
             if next_depth <= link_hop_limit and links:
@@ -243,7 +295,19 @@ async def bfs_crawl_same_site(
                     if link not in visited:
                         to_visit.append((link, next_depth))
 
-    print(f"📊 Done: {len(visited)} visited, {len(texts)} pages contributed to context.")
+    elapsed = time.perf_counter() - job_start
+    total_chars = sum(len(t) for t in texts)
+
+    _sep()
+    _banner("📊 CRAWL SUMMARY")
+    _field("Pages fetched", pages_fetched)
+    _field("Pages with content", len(texts))
+    _field("Pages skipped", pages_skipped)
+    _field("Pages failed", pages_failed)
+    _field("Total context", f"{total_chars:,} chars")
+    _field("Elapsed", f"{elapsed:.2f}s")
+    _sep()
+
     return "\n\n".join(texts)
 
 

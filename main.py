@@ -98,6 +98,23 @@ def _clamp_max_urls(v: Any, fallback: int) -> int:
     return max(1, min(n, 5000))
 
 
+_LOG_W = 64
+
+
+def _log_sep(char: str = "─") -> None:
+    logger.info(char * _LOG_W)
+
+
+def _log_banner(title: str, char: str = "═") -> None:
+    logger.info(char * _LOG_W)
+    logger.info("  %s", title)
+    logger.info(char * _LOG_W)
+
+
+def _log_field(label: str, value: object) -> None:
+    logger.info("    %-18s%s", label, value)
+
+
 def handle_request(req: Dict[str, Any]) -> Dict[str, Any]:
     """
     Input:
@@ -109,9 +126,6 @@ def handle_request(req: Dict[str, Any]) -> Dict[str, Any]:
       {"success": bool, "context": "...", "error": "...optional"}
     """
     try:
-        logger.info("=== HANDLE_REQUEST START ===")
-        logger.info("Request: %s", json.dumps(req, indent=2))
-
         if not isinstance(req, dict):
             return {"success": False, "context": "", "error": "Invalid request type"}
 
@@ -119,30 +133,44 @@ def handle_request(req: Dict[str, Any]) -> Dict[str, Any]:
         url = data.get("url") or data.get("u")
         ok, err = _validate_url(url)
         if not ok:
-            logger.error("URL validation failed: %s", err)
+            _log_banner("❌  SCRAPE REQUEST — REJECTED")
+            _log_field("Reason", err)
+            _log_field("URL", url)
+            _log_sep()
             return {"success": False, "context": "", "error": err}
 
         link_hop_limit = _clamp_link_hop_limit(data.get("linkhoplimit", data.get("link_hop_limit")))
         max_urls = _clamp_max_urls(data.get("maxurls"), _default_max_urls())
 
-        logger.info("Parameters: link_hop_limit=%s max_urls=%s", link_hop_limit, max_urls)
+        _log_banner("📥  SCRAPE REQUEST RECEIVED")
+        _log_field("URL", url)
+        _log_field("linkHopLimit", link_hop_limit)
+        _log_field("maxUrls", max_urls)
+        _log_sep()
 
         start_time = time.time()
         context = crawl_site(str(url), link_hop_limit=link_hop_limit, max_urls=max_urls)
-        logger.info("Crawl completed in %.2fs", time.time() - start_time)
+        elapsed = time.time() - start_time
 
         if not isinstance(context, str):
             context = "" if context is None else str(context)
 
         if not context.strip():
+            _log_banner("⚠️   SCRAPE COMPLETE — NO CONTENT")
+            _log_field("URL", url)
+            _log_field("Elapsed", f"{elapsed:.2f}s")
+            _log_sep()
             return {"success": False, "context": "", "error": "No extractable content from crawl"}
 
-        logger.info("Final context length: %s characters", len(context))
-        logger.info("=== HANDLE_REQUEST END ===")
+        _log_banner("✅  SCRAPE COMPLETE")
+        _log_field("URL", url)
+        _log_field("Context size", f"{len(context):,} chars")
+        _log_field("Elapsed", f"{elapsed:.2f}s")
+        _log_sep()
         return {"success": True, "context": context}
 
     except Exception as e:
-        logger.exception("Unhandled error in handle_request: %s", str(e))
+        logger.exception("Unhandled error in handle_request")
         return {"success": False, "context": "", "error": f"Internal error: {str(e)}"}
 
 
@@ -199,20 +227,16 @@ async def scrape(
     req_model: Optional[ScrapeRequest] = Body(default=None, description="Preferred JSON body."),
     request: Request = None,
 ):
-    logger.info("=== SCRAPE ENDPOINT START ===")
-
     body: Optional[Dict[str, Any]] = None
 
     if isinstance(req_model, ScrapeRequest):
         body = req_model.model_dump(exclude_none=False)
-        logger.info("Using validated ScrapeRequest model")
 
     if body is None:
         try:
             obj = await request.json()
             if isinstance(obj, dict):
                 body = obj
-                logger.info("Using raw JSON body")
         except Exception as e:
             logger.debug("Raw JSON parsing failed: %s", e)
 
@@ -223,16 +247,14 @@ async def scrape(
                 maybe = json.loads(raw)
                 if isinstance(maybe, dict):
                     body = maybe
-                    logger.info("Using raw text as JSON")
         except Exception as e:
-            logger.debug("Raw text parsing failed: %s", e)
+            logger.debug("Raw body parsing failed: %s", e)
 
     if body is None:
         try:
             form = await request.form()
             if form:
                 body = dict(form)
-                logger.info("Using form data")
         except Exception as e:
             logger.debug("Form parsing failed: %s", e)
 
@@ -240,15 +262,11 @@ async def scrape(
         logger.error("No valid request body found")
         return {"success": False, "context": "", "error": "Invalid or missing request body"}
 
-    logger.info("Final request body: %s", json.dumps(body, indent=2))
-
     try:
-        logger.info("Starting handler in worker thread")
         resp = await asyncio.to_thread(handle_request, body)
-        logger.info("Handler completed: success=%s", resp.get("success"))
         return resp
     except Exception as e:
-        logger.exception("Error in worker thread: %s", e)
+        logger.exception("Error in worker thread")
         return {"success": False, "context": "", "error": f"Thread error: {str(e)}"}
 
 
