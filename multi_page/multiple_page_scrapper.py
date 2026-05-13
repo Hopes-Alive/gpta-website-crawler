@@ -90,7 +90,29 @@ def clean_html(html_content: Optional[str]) -> str:
     text = "\n".join(parts)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n\s*\n+", "\n\n", text)
-    return text.strip()
+    if text.strip():
+        return text.strip()
+
+    # Many SPAs / marketing sites use almost no semantic tags after we strip chrome — fall back to body text.
+    body = soup.body
+    blob = (body or soup).get_text("\n", strip=True)
+    blob = re.sub(r"[ \t]+", " ", blob)
+    blob = re.sub(r"\n\s*\n+", "\n\n", blob)
+    return blob.strip()
+
+
+def _markdown_from_result(result: object) -> str:
+    """Best-effort string from Crawl4AI markdown field (str or MarkdownGenerationResult)."""
+    m = getattr(result, "markdown", None)
+    if m is None:
+        return ""
+    if isinstance(m, str):
+        return m.strip()
+    for attr in ("fit_markdown", "raw_markdown"):
+        raw = getattr(m, attr, None)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return ""
 
 
 # ---------- Crawl4AI single-page fetch (production) ----------
@@ -106,7 +128,8 @@ async def _fetch_and_extract(crawler: AsyncWebCrawler, url: str, base_domain: st
         check_robots_txt=True,
         remove_overlay_elements=True,
         page_timeout=60000,
-        wait_for="css:main, css:article, css:p, css:h1",
+        # Loose wait: many sites lack <main>/<article>; strict wait caused empty crawls on Azure.
+        wait_for="css:body",
         js_code=["window.scrollTo(0, document.body.scrollHeight);"],
     )
     result = await crawler.arun(url=url, config=cfg)
@@ -117,6 +140,8 @@ async def _fetch_and_extract(crawler: AsyncWebCrawler, url: str, base_domain: st
 
     html = getattr(result, "html", "") or ""
     cleaned_text = clean_html(html)
+    if not cleaned_text.strip():
+        cleaned_text = _markdown_from_result(result)
     low = cleaned_text.lower()
     if ("page you are trying to access is no longer available" in low) or ("404" in low and "page" in low):
         print(f" ⚠️ Skipped error/empty: {url}")
