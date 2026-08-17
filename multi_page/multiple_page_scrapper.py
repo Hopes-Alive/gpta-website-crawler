@@ -6,6 +6,7 @@ import hashlib
 import re
 import time
 from collections import deque
+from dataclasses import dataclass
 from typing import Awaitable, Callable, Optional
 from urllib.parse import urlparse, urljoin, urldefrag
 
@@ -32,6 +33,12 @@ def _field(label: str, value: object, indent: int = 4) -> None:
     print(f"{pad}{label:<18}{value}", flush=True)
 
 FetchOne = Callable[[str], Awaitable[tuple[list[str], str]]]
+
+
+@dataclass
+class CrawlResult:
+    context: str
+    pages: list[dict[str, object]]
 
 
 # ---------- URL + HTML helpers ----------
@@ -212,7 +219,7 @@ async def bfs_crawl_same_site(
     max_urls: int,
     batch_size: int,
     fetch_one: FetchOne,
-) -> str:
+) -> CrawlResult:
     """
     Same-domain BFS using Crawl4AI-style fetch_one(url) -> (internal_links, text).
 
@@ -223,7 +230,8 @@ async def bfs_crawl_same_site(
     max_urls: hard cap on distinct URLs visited (safety).
 
     Each unique URL is visited at most once; crawl stops when the queue is empty
-    or hop limit / max_urls is reached.
+    or hop limit / max_urls is reached. `pages` lists each URL that contributed
+    unique text, with its BFS hop.
     """
     parsed = urlparse(start_url)
     if not parsed.scheme or not parsed.netloc:
@@ -237,6 +245,8 @@ async def bfs_crawl_same_site(
     visited: set[str] = set()
     content_hashes: set[str] = set()
     texts: list[str] = []
+    pages: list[dict[str, object]] = []
+    indexed_urls: set[str] = set()
     pages_fetched = 0
     pages_skipped = 0
     pages_failed = 0
@@ -284,6 +294,9 @@ async def bfs_crawl_same_site(
                 if h not in content_hashes:
                     content_hashes.add(h)
                     texts.append(text)
+                    if u not in indexed_urls:
+                        indexed_urls.add(u)
+                        pages.append({"url": u, "hop": depth})
                 else:
                     print("       (duplicate content, skipped)", flush=True)
             else:
@@ -308,7 +321,7 @@ async def bfs_crawl_same_site(
     _field("Elapsed", f"{elapsed:.2f}s")
     _sep()
 
-    return "\n\n".join(texts)
+    return CrawlResult(context="\n\n".join(texts), pages=pages)
 
 
 async def _crawl_with_crawl4ai(
@@ -317,7 +330,7 @@ async def _crawl_with_crawl4ai(
     link_hop_limit: int,
     max_urls: int,
     batch_size: int = 5,
-) -> str:
+) -> CrawlResult:
     async with AsyncWebCrawler() as crawler:
         base_domain = (urlparse(start_url).hostname or "").lower()
 
@@ -339,7 +352,7 @@ def crawl_site(
     link_hop_limit: int,
     max_urls: int,
     batch_size: int = 5,
-) -> str:
+) -> CrawlResult:
     """
     Sync entry: Playwright-backed crawl for all hop levels (including 0 = single URL).
     """
@@ -356,7 +369,7 @@ def crawl_site(
 # ---------- Back-compat alias (internal / tests) ----------
 def crawl_full_site(url: str, max_pages: int = 50, max_depth: int = 3, batch_size: int = 5) -> str:
     """Deprecated: use crawl_site(link_hop_limit=..., max_urls=...)."""
-    return crawl_site(url, link_hop_limit=max_depth, max_urls=max_pages, batch_size=batch_size)
+    return crawl_site(url, link_hop_limit=max_depth, max_urls=max_pages, batch_size=batch_size).context
 
 
 if __name__ == "__main__":
@@ -371,7 +384,7 @@ if __name__ == "__main__":
             raise ValueError("Missing 'url'")
         hops = int(req.get("linkHopLimit", req.get("maxDepth", 0)))
         cap = int(req.get("maxUrls", 500))
-        ctx = crawl_site(u, link_hop_limit=hops, max_urls=cap)
-        print(json.dumps({"success": True, "context": ctx}))
+        result = crawl_site(u, link_hop_limit=hops, max_urls=cap)
+        print(json.dumps({"success": True, "context": result.context, "pages": result.pages}))
     except Exception as e:
         print(json.dumps({"success": False, "context": "", "error": str(e)}))

@@ -19,7 +19,8 @@ async def test_link_hop_zero_only_fetches_seed():
         batch_size=5,
         fetch_one=fetch_one,
     )
-    assert out == "only-seed"
+    assert out.context == "only-seed"
+    assert out.pages == [{"url": root, "hop": 0}]
     assert calls == [root]
 
 
@@ -37,8 +38,10 @@ async def test_bfs_respects_max_urls():
         batch_size=1,
         fetch_one=fetch_one,
     )
-    parts = [p for p in out.split("\n\n") if p]
+    parts = [p for p in out.context.split("\n\n") if p]
     assert len(parts) <= 3
+    assert 1 <= len(out.pages) <= 3
+    assert out.pages[0]["hop"] == 0
 
 
 @pytest.mark.asyncio
@@ -62,8 +65,9 @@ async def test_bfs_two_hops_linear_graph():
         batch_size=5,
         fetch_one=fetch_one,
     )
-    assert "A" in out1 and "B" in out1
-    assert "C" not in out1
+    assert "A" in out1.context and "B" in out1.context
+    assert "C" not in out1.context
+    assert out1.pages == [{"url": root, "hop": 0}, {"url": b, "hop": 1}]
 
     out2 = await bfs_crawl_same_site(
         root,
@@ -72,4 +76,9 @@ async def test_bfs_two_hops_linear_graph():
         batch_size=5,
         fetch_one=fetch_one,
     )
-    assert "C" in out2
+    assert "C" in out2.context
+    assert out2.pages == [
+        {"url": root, "hop": 0},
+        {"url": b, "hop": 1},
+        {"url": c, "hop": 2},
+    ]

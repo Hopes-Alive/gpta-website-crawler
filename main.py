@@ -123,7 +123,7 @@ def handle_request(req: Dict[str, Any]) -> Dict[str, Any]:
     linkHopLimit: 0 = seed URL only; N = follow same-domain links up to N hops (BFS).
 
     Output:
-      {"success": bool, "context": "...", "error": "...optional"}
+      {"success": bool, "context": "...", "pages": [{"url": "...", "hop": 0}], "error": "...optional"}
     """
     try:
         if not isinstance(req, dict):
@@ -149,9 +149,11 @@ def handle_request(req: Dict[str, Any]) -> Dict[str, Any]:
         _log_sep()
 
         start_time = time.time()
-        context = crawl_site(str(url), link_hop_limit=link_hop_limit, max_urls=max_urls)
+        result = crawl_site(str(url), link_hop_limit=link_hop_limit, max_urls=max_urls)
         elapsed = time.time() - start_time
 
+        context = result.context if hasattr(result, "context") else ""
+        pages = list(result.pages) if hasattr(result, "pages") else []
         if not isinstance(context, str):
             context = "" if context is None else str(context)
 
@@ -160,14 +162,15 @@ def handle_request(req: Dict[str, Any]) -> Dict[str, Any]:
             _log_field("URL", url)
             _log_field("Elapsed", f"{elapsed:.2f}s")
             _log_sep()
-            return {"success": False, "context": "", "error": "No extractable content from crawl"}
+            return {"success": False, "context": "", "pages": [], "error": "No extractable content from crawl"}
 
         _log_banner("✅  SCRAPE COMPLETE")
         _log_field("URL", url)
         _log_field("Context size", f"{len(context):,} chars")
+        _log_field("Pages", len(pages))
         _log_field("Elapsed", f"{elapsed:.2f}s")
         _log_sep()
-        return {"success": True, "context": context}
+        return {"success": True, "context": context, "pages": pages}
 
     except Exception as e:
         logger.exception("Unhandled error in handle_request")

@@ -25,6 +25,8 @@ python main.py --host 0.0.0.0 --port 8000
 | `linkHopLimit` | int 0–20 | `0` = seed only; `N` = follow same-domain links up to N hops (BFS) |
 | `maxUrls` | int (optional) | Hard cap on pages visited (1–5000); omit to use `WEBSITE_SCRAPE_MAX_URLS` (default 1500) |
 
+Success response includes `pages: [{ "url", "hop" }]` so the product UI can list every fetched URL by hop. Seed is hop `0`.
+
 ## Examples
 
 ```bash

@@ -81,9 +81,15 @@ Success:
 ```json
 {
   "success": true,
-  "context": "Extracted text content from the page or crawl..."
+  "context": "Extracted text content from the page or crawl...",
+  "pages": [
+    { "url": "https://example.com", "hop": 0 },
+    { "url": "https://example.com/about", "hop": 1 }
+  ]
 }
 ```
+
+`pages` is the same-site inventory the consumer stores for the UI: seed is hop `0`, links found on that page are hop `1`, and so on.
 
 Failure:
 
@@ -95,7 +101,7 @@ Failure:
 }
 ```
 
-The `context` field is plain extracted text intended for downstream processing, such as indexing, summarization, or feeding into an LLM. It is not HTML and it is not a structured page list.
+The `context` field is plain extracted text intended for downstream processing, such as indexing, summarization, or feeding into an LLM. It is not HTML. Use `pages` for the structured URL list.
 
 ## JavaScript / TypeScript Example
 
