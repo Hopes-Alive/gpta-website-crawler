@@ -49,9 +49,9 @@ The script:
 4. `docker push`
 5. `az webapp config container set` so the Web App pulls that image
 
-## Web App registry settings (Azure Portal)
+## Web App registry settings
 
-Your app should already have **pull** credentials (e.g. `DOCKER_REGISTRY_SERVER_*` for [ghcr.io](https://ghcr.io)). The script only updates the **image:tag**; if the first deploy fails, set registry URL / user / PAT in the portal as in [DEPLOY-AZURE.md](./DEPLOY-AZURE.md).
+For `crexpressagentprodaue`, the registry admin user is disabled. The script logs in with `az acr login`, then tells the Web App to pull with the user-assigned identity `id-expressagent-crawler-prod-aue`. Do not put an ACR password in `.env.deploy.local`.
 
 ## GPTA
 

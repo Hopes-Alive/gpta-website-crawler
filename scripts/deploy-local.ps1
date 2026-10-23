@@ -93,11 +93,18 @@ docker push $image
 Assert-Exit "docker push"
 
 Write-Host "Updating Web App container (Azure CLI) ..."
-az webapp config container set `
-  --subscription $sub `
-  --resource-group $rg `
-  --name $webapp `
-  --container-image-name $image
+$containerArgs = @(
+  "webapp", "config", "container", "set",
+  "--subscription", $sub,
+  "--resource-group", $rg,
+  "--name", $webapp,
+  "--container-image-name", $image
+)
+if ($lower -match "\.azurecr\.io/") {
+  $registryHost = $image.Split("/")[0]
+  $containerArgs += @("--container-registry-url", "https://$registryHost")
+}
+az @containerArgs
 Assert-Exit "az webapp config container set"
 
 if ($lower -match "\.azurecr\.io/") {

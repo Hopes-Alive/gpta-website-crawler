@@ -50,11 +50,17 @@ echo "Pushing $DEPLOY_IMAGE ..."
 docker push "$DEPLOY_IMAGE"
 
 echo "Updating Web App ..."
+registry_args=()
+if echo "$ilower" | grep -qE '\.azurecr\.io/'; then
+  registry_host="${DEPLOY_IMAGE%%/*}"
+  registry_args=(--container-registry-url "https://${registry_host}")
+fi
 az webapp config container set \
   --subscription "$AZURE_SUBSCRIPTION_ID" \
   --resource-group "$AZURE_RESOURCE_GROUP" \
   --name "$AZURE_WEBAPP_NAME" \
-  --container-image-name "$DEPLOY_IMAGE"
+  --container-image-name "$DEPLOY_IMAGE" \
+  "${registry_args[@]}"
 
 if echo "$ilower" | grep -qE '\.azurecr\.io/'; then
   if [[ -n "${ACR_IDENTITY_NAME:-}" ]]; then
