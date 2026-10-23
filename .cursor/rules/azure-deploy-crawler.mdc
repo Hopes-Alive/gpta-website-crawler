@@ -46,6 +46,6 @@ Do not ask them to paste **GHCR_TOKEN** or PATs into the chat.
 
 3. If `gh` is not available or not authenticated, tell them to use **GitHub → Actions** → **Deploy crawler (GHCR + Web App)** or **Deploy crawler (ACR + Web App)** → **Run workflow**.
 
-4. After a successful deploy, remind them to set GPTA **`WEBSITE_CRAWLER_URL`** to `https://<their-app-host>/scrape` (e.g. regional hostname like `https://website-crawler-….azurewebsites.net/scrape`).
+4. After a successful deploy, remind them to set GPTA **`WEBSITE_CRAWLER_URL`** to `https://app-expressagent-crawler-prod-aue.azurewebsites.net/scrape`. Do that only after `/health` on that host returns successfully. The API keeps using the previous crawler until that setting changes.
 
 Do **not** re-run a deploy if a workflow is already in progress unless the user explicitly asks to retry or cancel.

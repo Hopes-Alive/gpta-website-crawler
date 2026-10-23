@@ -3,7 +3,7 @@ param(
   [string]$Ref = "main",
   [string]$ImageTag = "",
   [ValidateSet("ghcr", "acr")]
-  [string]$Registry = "ghcr"
+  [string]$Registry = "acr"
 )
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot

@@ -10,13 +10,15 @@ Pick **one** registry path:
 
 ---
 
-## GitHub Container Registry (GHCR) — typical setup
+## GitHub Container Registry (GHCR)
 
-Your Web App already has registry settings similar to:
+The production crawler app pulls from Azure Container Registry `crexpressagentprodaue` with the user-assigned identity `id-expressagent-crawler-prod-aue`. Use the ACR workflow for that app.
+
+GHCR remains available if a Web App is configured with:
 
 - `DOCKER_REGISTRY_SERVER_URL` = `https://ghcr.io`
-- `DOCKER_REGISTRY_SERVER_USERNAME` = your GitHub user (e.g. `zuhairm2001`)
-- `DOCKER_REGISTRY_SERVER_PASSWORD` = a **GitHub PAT** with `read:packages` (and `write:packages` only if you push manually from laptop — **not** stored in this repo)
+- `DOCKER_REGISTRY_SERVER_USERNAME` = the GitHub user that owns the package
+- `DOCKER_REGISTRY_SERVER_PASSWORD` = a **GitHub PAT** with `read:packages` (and `write:packages` only if you push manually from a laptop — **not** stored in this repo)
 
 **Do not** paste the PAT into GitHub Issues or chat. Only in **Azure Portal → Web App → Configuration**.
 
@@ -24,9 +26,9 @@ Your Web App already has registry settings similar to:
 
 | Variable | Your example | Notes |
 |----------|----------------|-------|
-| `AZURE_RESOURCE_GROUP` | `mpn-aicg-hotelai-perm-dev-rg-ae` | Resource group containing the Web App |
-| `AZURE_WEBAPP_NAME` | `website-crawler` | Azure **resource** name from `az webapp list` (Name column). The default hostname can still look like `website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net` ([live check](https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/)). |
-| `GHCR_IMAGE` (optional) | `ghcr.io/zuhairm2001/gpta-website-crawler` | Set if the image name **must** differ from `ghcr.io/<lowercase_owner>/<lowercase_repo>` |
+| `AZURE_RESOURCE_GROUP` | `expressagent-perm-prod-rg-ae` | Resource group containing the Web App |
+| `AZURE_WEBAPP_NAME` | `app-expressagent-crawler-prod-aue` | Azure **resource** name. Hostname: `app-expressagent-crawler-prod-aue.azurewebsites.net` |
+| `GHCR_IMAGE` (optional) | `ghcr.io/hopes-alive/gpta-website-crawler` | Set if the image name **must** differ from `ghcr.io/<lowercase_owner>/<lowercase_repo>` |
 
 ### GitHub Actions secrets (same for GHCR or ACR deploy)
 
@@ -45,7 +47,7 @@ gh workflow run deploy-ghcr-webapp.yml --ref main
 Use the public app URL (no trailing slash before path is fine):
 
 ```text
-https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/scrape
+https://app-expressagent-crawler-prod-aue.azurewebsites.net/scrape
 ```
 
 ### Portal hygiene
@@ -86,10 +88,10 @@ Use a **federated workload identity** so GitHub never stores Azure passwords.
 
    | Name | Example | Meaning |
    |------|---------|--------|
-   | `ACR_NAME` | `mycompanyacr` | Registry **short name** (not the full `*.azurecr.io` host) |
-   | `IMAGE_REPOSITORY` | `gpta-website-crawler` | Image name **inside** ACR (create in portal or first push creates it) |
-   | `AZURE_RESOURCE_GROUP` | `rg-ai-prod` | Resource group that contains the **Web App** |
-   | `AZURE_WEBAPP_NAME` | `app-gpta-crawler-prod` | Linux Web App name |
+   | `ACR_NAME` | `crexpressagentprodaue` | Registry **short name** (not the full `*.azurecr.io` host). Admin user is disabled. |
+   | `IMAGE_REPOSITORY` | `gpta-website-crawler` | Image name **inside** ACR (the first push creates it) |
+   | `AZURE_RESOURCE_GROUP` | `expressagent-perm-prod-rg-ae` | Resource group that contains the **Web App** |
+   | `AZURE_WEBAPP_NAME` | `app-expressagent-crawler-prod-aue` | Linux Web App name |
 
 ## Web App settings (Azure Portal)
 
