@@ -46,6 +46,7 @@ function Assert-Exit([string]$step) {
 $image = Require-Env "DEPLOY_IMAGE"
 $webapp = Require-Env "AZURE_WEBAPP_NAME"
 $rg = Require-Env "AZURE_RESOURCE_GROUP"
+$sub = Require-Env "AZURE_SUBSCRIPTION_ID"
 
 foreach ($cmd in @("docker", "az")) {
   if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
@@ -79,7 +80,7 @@ elseif ($image -match "^[^/]+\.azurecr\.io/") {
       $acrName = $server.Split(".")[0]
     }
     Write-Host "Logging in to ACR $acrName with Azure CLI ..."
-    az acr login --name $acrName
+    az acr login --name $acrName --subscription $sub
     Assert-Exit "az acr login ($acrName)"
   }
 }
@@ -93,13 +94,41 @@ Assert-Exit "docker push"
 
 Write-Host "Updating Web App container (Azure CLI) ..."
 az webapp config container set `
+  --subscription $sub `
   --resource-group $rg `
   --name $webapp `
   --container-image-name $image
 Assert-Exit "az webapp config container set"
 
+if ($lower -match "\.azurecr\.io/") {
+  $identityName = Optional-Env "ACR_IDENTITY_NAME"
+  if ($identityName) {
+    $identityId = az identity show --subscription $sub -g $rg -n $identityName --query id -o tsv
+    Assert-Exit "az identity show"
+    $principalId = az identity show --subscription $sub -g $rg -n $identityName --query principalId -o tsv
+    Assert-Exit "az identity show principal"
+    $acrName = Optional-Env "ACR_NAME"
+    if (-not $acrName) {
+      $acrName = ($image.Split("/")[0]).Split(".")[0]
+    }
+    $acrId = az acr show --subscription $sub -n $acrName --query id -o tsv
+    Assert-Exit "az acr show"
+    $roles = az role assignment list --subscription $sub --scope $acrId --assignee-object-id $principalId --query "[].roleDefinitionName" -o tsv
+    if (-not ($roles -match "AcrPull")) {
+      az role assignment create --subscription $sub --assignee-object-id $principalId --assignee-principal-type ServicePrincipal --role AcrPull --scope $acrId
+      Assert-Exit "az role assignment create AcrPull"
+    }
+    az webapp config set --subscription $sub -g $rg -n $webapp --acr-use-identity true --acr-identity $identityId
+    Assert-Exit "az webapp config set acr identity"
+  }
+}
+
+Write-Host "Setting WEBSITES_PORT=8000 ..."
+az webapp config appsettings set --subscription $sub -g $rg -n $webapp --settings WEBSITES_PORT=8000
+Assert-Exit "az webapp config appsettings set WEBSITES_PORT"
+
 Write-Host "Restarting app ..."
-az webapp restart --resource-group $rg --name $webapp
+az webapp restart --subscription $sub --resource-group $rg --name $webapp
 Assert-Exit "az webapp restart"
 
 Write-Host "Done. Image: $image"

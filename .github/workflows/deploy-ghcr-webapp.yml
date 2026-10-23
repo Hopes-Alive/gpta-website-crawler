@@ -2,7 +2,8 @@
 #
 # Required GitHub Actions secrets (OIDC): AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
 # Required GitHub Actions variables: AZURE_RESOURCE_GROUP, AZURE_WEBAPP_NAME
-# Optional variable: GHCR_IMAGE (full base without tag, e.g. ghcr.io/zuhairm2001/gpta-website-crawler). If unset, uses ghcr.io/<lowercase_owner>/<lowercase_repo_name>.
+# Optional variable: GHCR_IMAGE (full base without tag, e.g. ghcr.io/hopes-alive/gpta-website-crawler). If unset, uses ghcr.io/<lowercase_owner>/<lowercase_repo_name>.
+# Production app pulls from ACR crexpressagentprodaue, not GHCR. Prefer deploy-acr-webapp.yml.
 #
 # Workflow needs permission to push packages: packages: write (uses GITHUB_TOKEN for ghcr.io login).
 # See docs/DEPLOY-AZURE.md (GHCR section).

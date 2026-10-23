@@ -17,7 +17,7 @@ The GitHub CLI OAuth token often has scopes like `repo` only. Pushing to `ghcr.i
 
 ### Web App name vs URL
 
-`AZURE_WEBAPP_NAME` must be the **Azure resource name** (`az webapp list -g YOUR_RG -o table` → **Name** column), for example `website-crawler`. It is **not** the first segment of `*.azurewebsites.net` unless they happen to match.
+`AZURE_WEBAPP_NAME` must be the **Azure resource name** (`az webapp list -g expressagent-perm-prod-rg-ae -o table` → **Name** column): `app-expressagent-crawler-prod-aue`. Set `AZURE_SUBSCRIPTION_ID` as well. The default `az` account is often a different subscription.
 
 ## Configure once
 

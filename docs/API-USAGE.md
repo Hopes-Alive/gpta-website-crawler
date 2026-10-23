@@ -7,7 +7,7 @@ Use this service from another Web App when you need to scrape one public web pag
 Current Azure Web App:
 
 ```text
-https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net
+https://app-expressagent-crawler-prod-aue.azurewebsites.net
 ```
 
 Health check:
@@ -16,23 +16,34 @@ Health check:
 GET /health
 ```
 
-Scrape endpoint:
+Scrape endpoint (blocking compatibility):
 
 ```text
 POST /scrape
 ```
 
+Async job API (preferred for live crawl progress; Azure App Service may drop long POSTs):
+
+```text
+POST /scrape/start
+GET  /scrape/jobs/{jobId}
+GET  /scrape/jobs/{jobId}/result
+POST /scrape/jobs/{jobId}/cancel
+```
+
 Full production URL:
 
 ```text
-https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/scrape
+https://app-expressagent-crawler-prod-aue.azurewebsites.net/scrape
 ```
 
 In the consuming Web App, store this as an environment variable:
 
 ```env
-WEBSITE_CRAWLER_URL=https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/scrape
+WEBSITE_CRAWLER_URL=https://app-expressagent-crawler-prod-aue.azurewebsites.net/scrape
 ```
+
+The Express Agent API still calls the previous crawler. Change `WEBSITE_CRAWLER_URL` on the API apps to the URL above only after this app is running the crawler image.
 
 ## Request
 
@@ -102,6 +113,109 @@ Failure:
 ```
 
 The `context` field is plain extracted text intended for downstream processing, such as indexing, summarization, or feeding into an LLM. It is not HTML. Use `pages` for the structured URL list.
+
+## Async job API (live progress)
+
+Prefer this path when the caller needs to show which page is being scraped. `POST /scrape` remains the blocking compatibility API (one JSON body when the whole BFS finishes).
+
+Jobs live in memory on a **single** app instance and are removed about **2 hours** after complete, fail, or cancel. URL validation is the same as `POST /scrape` (public `http(s)` only).
+
+### Start
+
+`POST /scrape/start` with the same JSON body as `POST /scrape`.
+
+`202`:
+
+```json
+{ "success": true, "jobId": "3f1c0a2e-2c8a-4f1d-9e3a-7b2d1c4e5f60" }
+```
+
+Invalid URL: `400` `{ "success": false, "error": "..." }` (no job is created).
+
+### Poll
+
+`GET /scrape/jobs/{jobId}` about every 2.5s. The poll payload does **not** include `context`.
+
+```json
+{
+  "success": true,
+  "jobId": "3f1c0a2e-2c8a-4f1d-9e3a-7b2d1c4e5f60",
+  "status": "running",
+  "progress": {
+    "pagesDone": 4,
+    "maxUrls": 100,
+    "queueSize": 12,
+    "lastUrls": ["https://example.com/about", "https://example.com/contact"],
+    "linksDiscoveredLastBatch": 8,
+    "collectedPages": [
+      { "url": "https://example.com/", "hop": 0 },
+      { "url": "https://example.com/about", "hop": 1 }
+    ],
+    "phase": "crawling"
+  },
+  "error": null
+}
+```
+
+`status`: `queued` | `running` | `complete` | `failed` | `cancelled`.  
+`progress.phase`: `crawling` until the crawl loop ends, then `complete` or `failed`.  
+`collectedPages` lists fetched URLs in order (seed hop `0`), capped at 200. `lastUrls` are full URLs from the latest batch (max 8).
+
+Unknown `jobId`: `404`.
+
+### Result
+
+`GET /scrape/jobs/{jobId}/result`
+
+| Job status | HTTP | Body |
+|---|---|---|
+| `complete` | 200 | `{ "success": true, "context": "...", "pages": [{ "url", "hop" }] }` (same as blocking `POST /scrape`) |
+| `failed` | 200 | `{ "success": false, "context": "", "error": "..." }` |
+| `queued` / `running` | 409 | `{ "success": false, "error": "Job still running" }` |
+
+### Cancel
+
+`POST /scrape/jobs/{jobId}/cancel` stops the crawl between batches and returns pages fetched so far:
+
+```json
+{
+  "success": true,
+  "status": "cancelled",
+  "pages": [
+    { "url": "https://example.com/", "hop": 0 }
+  ]
+}
+```
+
+The crawler does not decide whether to index a partial crawl; the caller does.
+
+### TypeScript poll example
+
+```ts
+const crawlerOrigin = process.env.WEBSITE_CRAWLER_ORIGIN; // host only, no /scrape
+
+const start = await fetch(`${crawlerOrigin}/scrape/start`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ url: "https://example.com", linkHopLimit: 2, maxUrls: 200 }),
+});
+const { jobId } = await start.json();
+
+for (;;) {
+  const snap = await fetch(`${crawlerOrigin}/scrape/jobs/${jobId}`);
+  const job = await snap.json();
+  // job.progress.lastUrls / collectedPages → live UI
+  if (job.status === "complete") {
+    const done = await fetch(`${crawlerOrigin}/scrape/jobs/${jobId}/result`);
+    const result = await done.json();
+    break;
+  }
+  if (job.status === "failed" || job.status === "cancelled") {
+    break;
+  }
+  await new Promise((r) => setTimeout(r, 2500));
+}
+```
 
 ## JavaScript / TypeScript Example
 
@@ -174,15 +288,16 @@ public sealed record CrawlerResponse(bool Success, string Context, string? Error
 ## curl Example
 
 ```bash
-curl -X POST "https://website-crawler-e0chg5dhhugzgyfm.australiaeast-01.azurewebsites.net/scrape" \
+curl -X POST "https://app-expressagent-crawler-prod-aue.azurewebsites.net/scrape" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com","linkHopLimit":0,"maxUrls":200}'
 ```
 
 ## Notes For Calling Apps
 
-- The endpoint is public HTTPS and currently does not require an API key.
-- Set a long timeout in the calling app. Multi-page Playwright crawls can take several minutes.
+- The **blocking** `POST /scrape` endpoint is public HTTPS and currently does not require an API key. Set a long timeout; multi-page Playwright crawls can take several minutes.
+- For live progress, use `POST /scrape/start` and poll `GET /scrape/jobs/{jobId}` (short timeouts). Fetch `context` from `/result` only after `complete`.
+- Jobs are in-memory (one app instance). Do not scale the crawler to multiple instances if you rely on job polling.
 - Use `linkHopLimit: 0` for fastest single-page extraction.
 - Use `maxUrls` whenever `linkHopLimit` is greater than `0` to avoid unexpectedly large crawls.
 - Only public internet URLs are accepted by the crawler.

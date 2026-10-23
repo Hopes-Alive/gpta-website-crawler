@@ -1,7 +1,8 @@
 # Build Docker image → push to Azure Container Registry → update Linux Web App container
 #
 # Required GitHub Actions secrets (OIDC): AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
-# Required GitHub Actions variables: ACR_NAME, AZURE_RESOURCE_GROUP, AZURE_WEBAPP_NAME, IMAGE_REPOSITORY
+# Required GitHub Actions variables: ACR_NAME=crexpressagentprodaue, AZURE_RESOURCE_GROUP=expressagent-perm-prod-rg-ae, AZURE_WEBAPP_NAME=app-expressagent-crawler-prod-aue, IMAGE_REPOSITORY=gpta-website-crawler
+# AZURE_SUBSCRIPTION_ID must be the Express Agent subscription b996c037-ba63-4d7c-9ffb-b3c2e8e99e54. This repo has no Actions secrets yet, so this workflow cannot log in until those OIDC secrets exist for the new tenant.
 # See docs/DEPLOY-AZURE.md
 
 name: Deploy crawler (ACR + Web App)
